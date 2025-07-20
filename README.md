@@ -22,8 +22,8 @@ An **AI-driven** tool that automates code reviews specifically tailored for **Ma
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-org/ai-ml-code-review.git
-   cd ai-ml-code-review
+   git clone https://github.com/Prasanna-Nadrajan/AI-Powered-Code-Review-for-ML-Pipelines.git
+   cd AI-Powered-Code-Review-for-ML-Pipelines.git
 
 
 2. **Create a virtual environment**:

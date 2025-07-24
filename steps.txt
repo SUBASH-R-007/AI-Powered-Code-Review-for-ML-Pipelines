@@ -1,0 +1,6 @@
+backend first:-
+docker build -t ai-code-reviewer .
+docker run -p 8000:8000 ai-code-reviewer
+
+frontend next:-
+python -m http.server 8080

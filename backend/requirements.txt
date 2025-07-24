@@ -1,0 +1,7 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2
+gitpython==3.1.43
+joblib==1.4.2
+scikit-learn==1.5.2

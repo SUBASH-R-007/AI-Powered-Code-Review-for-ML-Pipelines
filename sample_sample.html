@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Code Review for ML Pipelines</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: A task-oriented dashboard. The user is guided through a linear flow: 1. See the tool's purpose. 2. Input code (pre-filled for demo). 3. Trigger an analysis. 4. Explore a multi-faceted results dashboard. This structure was chosen to mimic a real user's workflow, making the tool's value proposition immediately clear and interactive. The dashboard is broken into a high-level summary (score), a categorical breakdown (issue types), and a detailed view (findings list), allowing users to drill down from a macro to a micro view of the code's quality, which is an intuitive way to absorb complex information. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Overall code quality -> Goal: Inform (at a glance) -> Viz: Donut Chart for a "Quality Score" -> Interaction: Hover for tooltips -> Justification: High-impact, immediate visual summary -> Library: Chart.js
+        - Report Info: Breakdown of issue types -> Goal: Compare/Organize -> Viz: Vertical Bar Chart -> Interaction: Click a bar to filter the detailed findings list -> Justification: Clearly compares issue counts and links summary data to specifics, enhancing exploration -> Library: Chart.js
+        - Report Info: Performance impact -> Goal: Show Change/Compare -> Viz: Line Chart -> Interaction: Static view of 'before' vs 'after' potential -> Justification: Effectively visualizes the benefit of applying performance-related fixes -> Library: Chart.js
+        - Report Info: Specific code issues -> Goal: Detail/Inform -> Viz: Styled HTML cards -> Interaction: List is filtered by the bar chart clicks -> Justification: Presents detailed, actionable information in a structured and readable format without overwhelming the user. -> Method: HTML/CSS/JS
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-mono {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 280px;
+            }
+        }
+        .finding-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .finding-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4f46e5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hide {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto px-4 py-8 md:py-12">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-stone-900">AI-Powered Code Review</h1>
+            <p class="mt-4 text-lg text-stone-600 max-w-3xl mx-auto">An intelligent tool to analyze your ML pipelines for best practices, performance bottlenecks, and potential bugs.</p>
+        </header>
+
+        <main id="mainContent">
+            <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8 max-w-4xl mx-auto">
+                <div class="text-center">
+                    <h2 class="text-2xl font-semibold text-stone-800">Analyze Your ML Pipeline</h2>
+                    <p class="mt-2 text-stone-500">Paste your Python code below or use our sample script to see the AI analysis in action.</p>
+                </div>
+                
+                <div class="mt-6">
+                    <textarea id="codeInput" class="w-full h-80 p-4 font-mono text-sm bg-stone-900 text-stone-200 border border-stone-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" spellcheck="false"></textarea>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <button id="analyzeBtn" class="bg-indigo-600 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
+                        Analyze Code
+                    </button>
+                </div>
+            </div>
+
+            <div id="loaderSection" class="hide flex flex-col items-center justify-center my-16">
+                <div class="loader"></div>
+                <p class="mt-4 text-stone-600 font-medium">Analyzing your code...</p>
+            </div>
+
+            <div id="resultsDashboard" class="hide mt-16">
+                <div class="text-center mb-12">
+                     <h2 class="text-3xl font-bold text-stone-900">Analysis Dashboard</h2>
+                     <p class="mt-2 text-stone-600">Here's the breakdown of your code's quality. Click on the "Issue Categories" bars to filter the detailed findings.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-4">Code Quality Score</h3>
+                        <div class="chart-container w-full max-w-xs mx-auto">
+                            <canvas id="qualityScoreChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-4">Issue Categories</h3>
+                        <div class="chart-container">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-stone-800 mb-4">Performance Impact</h3>
+                    <p class="text-sm text-stone-500 mb-4 -mt-2">Estimated pipeline execution time before and after applying suggested performance optimizations.</p>
+                    <div class="chart-container h-64 md:h-72">
+                         <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+
+                <div id="findingsSection" class="mt-12">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 id="findingsTitle" class="text-2xl font-bold text-stone-900">Detailed Findings</h3>
+                         <button id="showAllBtn" class="text-indigo-600 font-semibold hover:text-indigo-800 transition hide">Show All</button>
+                    </div>
+                    <div id="findingsList" class="space-y-4">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const sampleCode = `import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import pickle
+
+# Bad Practice: Hardcoded file path
+DATA_PATH = "/user/local/data/raw_data.csv"
+
+def load_data(path):
+    # Bug: No error handling for file not found
+    df = pd.read_csv(path)
+    return df
+
+def preprocess_data(df):
+    # Performance: Inefficiently fills missing values column by column
+    for col in df.columns:
+        if df[col].isnull().any():
+            df[col].fillna(df[col].mean(), inplace=True)
+    
+    # Redundant variable
+    processed_df = df
+    return processed_df
+
+def train_model(df, target_column):
+    X = df.drop(target_column, axis=1)
+    y = df[target_column]
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+    
+    # Performance: Using a large number of estimators without justification
+    model = RandomForestClassifier(n_estimators=500, n_jobs=1) # n_jobs=1 is inefficient
+    model.fit(X_train, y_train)
+    
+    # Security: Saving model with pickle can be insecure
+    with open('model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+        
+    return model, X_test, y_test
+
+def evaluate_model(model, X_test, y_test):
+    predictions = model.predict(X_test)
+    acc = accuracy_score(y_test, predictions)
+    print(f"Model Accuracy: {acc}") # Bad practice: uses print instead of logging
+    return acc
+
+if __name__ == "__main__":
+    raw_df = load_data(DATA_PATH)
+    data = preprocess_data(raw_df)
+    model, X_test, y_test = train_model(data, 'target')
+    evaluate_model(model, X_test, y_test)`;
+    
+    const codeInputElement = document.getElementById('codeInput');
+    codeInputElement.value = sampleCode;
+
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const mainContent = document.getElementById('mainContent');
+    const loaderSection = document.getElementById('loaderSection');
+    const resultsDashboard = document.getElementById('resultsDashboard');
+    const findingsList = document.getElementById('findingsList');
+    const findingsTitle = document.getElementById('findingsTitle');
+    const showAllBtn = document.getElementById('showAllBtn');
+
+    const allFindings = [
+        { 
+            category: 'Performance', 
+            severity: 'Major', 
+            title: 'Inefficient Missing Value Imputation', 
+            description: 'Looping through columns to fill NaNs is less efficient than using `df.fillna(df.mean())` which performs the operation in a vectorized manner.',
+            code: `for col in df.columns:\n    if df[col].isnull().any():\n        df[col].fillna(...)`,
+            suggestion: 'Use `df.fillna(df.mean(), inplace=True)` to fill all numeric NaNs at once for better performance.'
+        },
+        { 
+            category: 'Performance', 
+            severity: 'Major', 
+            title: 'Inefficient `n_jobs` in RandomForest', 
+            description: '`n_jobs` is set to 1, meaning only one CPU core will be used for training. This significantly slows down the process for ensemble models.',
+            code: `model = RandomForestClassifier(n_estimators=500, n_jobs=1)`,
+            suggestion: 'Set `n_jobs=-1` to use all available CPU cores and parallelize the training process, leading to a dramatic speed-up.'
+        },
+        { 
+            category: 'Bug', 
+            severity: 'Critical', 
+            title: 'No Error Handling for File Loading', 
+            description: 'The `load_data` function does not handle the case where the file at the specified path does not exist, which will crash the program.',
+            code: `def load_data(path):\n    df = pd.read_csv(path)`,
+            suggestion: 'Wrap the `pd.read_csv` call in a `try...except FileNotFoundError` block to handle the error gracefully.'
+        },
+        { 
+            category: 'Best Practice', 
+            severity: 'Minor', 
+            title: 'Hardcoded File Path', 
+            description: 'Using a hardcoded absolute path makes the script less portable and harder to run in different environments.',
+            code: `DATA_PATH = "/user/local/data/raw_data.csv"`,
+            suggestion: 'Pass the file path as a command-line argument using `argparse` or load it from a configuration file.'
+        },
+        { 
+            category: 'Best Practice', 
+            severity: 'Minor', 
+            title: 'Use of `print` for Logging', 
+            description: 'Using `print` for important outputs like model accuracy is bad practice in production code. A proper logging framework offers more control.',
+            code: `print(f"Model Accuracy: {acc}")`,
+            suggestion: 'Use the `logging` module to log information. This allows for setting log levels (INFO, DEBUG, ERROR) and directing output to files.'
+        },
+        { 
+            category: 'Security', 
+            severity: 'Major', 
+            title: 'Insecure Deserialization with `pickle`', 
+            description: 'Loading a model from a pickle file can execute arbitrary code if the file is malicious. This is a significant security risk.',
+            code: `with open('model.pkl', 'wb') as f:\n    pickle.dump(model, f)`,
+            suggestion: 'Use safer formats like ONNX or `joblib` for model serialization. If `pickle` must be used, only load files from trusted sources.'
+        },
+         { 
+            category: 'Best Practice', 
+            severity: 'Minor', 
+            title: 'Redundant Variable Assignment', 
+            description: 'The variable `processed_df` is assigned the value of `df` and then returned, which is an unnecessary step.',
+            code: `processed_df = df\nreturn processed_df`,
+            suggestion: 'Simply `return df` directly at the end of the `preprocess_data` function.'
+        },
+    ];
+
+    const severityStyles = {
+        'Critical': 'bg-red-100 text-red-800 border-red-500',
+        'Major': 'bg-orange-100 text-orange-800 border-orange-500',
+        'Minor': 'bg-blue-100 text-blue-800 border-blue-500'
+    };
+
+    let qualityScoreChart, categoryChart, performanceChart;
+
+    const renderFindings = (findingsToShow) => {
+        findingsList.innerHTML = '';
+        if (findingsToShow.length === 0) {
+            findingsList.innerHTML = '<p class="text-stone-500 text-center">No findings in this category.</p>';
+            return;
+        }
+        findingsToShow.forEach(finding => {
+            const severityClass = severityStyles[finding.severity] || 'bg-gray-100 text-gray-800 border-gray-500';
+            const card = `
+                <div class="finding-card bg-white p-5 rounded-lg border-l-4 ${severityClass} shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <h4 class="text-lg font-semibold text-stone-900">${finding.title}</h4>
+                        <span class="text-sm font-medium px-3 py-1 rounded-full ${severityClass}">${finding.severity}</span>
+                    </div>
+                    <p class="mt-2 text-stone-600">${finding.description}</p>
+                    <div class="mt-4 space-y-2">
+                        <div>
+                            <p class="text-sm font-semibold text-stone-500">Problematic Code:</p>
+                            <pre class="bg-stone-100 p-3 rounded-md text-sm font-mono text-stone-800 mt-1 overflow-x-auto"><code>${finding.code}</code></pre>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-green-700">Suggestion:</p>
+                            <p class="mt-1 text-stone-600">${finding.suggestion}</p>
+                        </div>
+                    </div>
+                </div>`;
+            findingsList.innerHTML += card;
+        });
+    };
+
+    const filterAndRenderFindings = (category) => {
+        const filtered = allFindings.filter(f => f.category === category);
+        findingsTitle.textContent = `${category} Findings`;
+        showAllBtn.classList.remove('hide');
+        renderFindings(filtered);
+    };
+    
+    showAllBtn.addEventListener('click', () => {
+        renderFindings(allFindings);
+        findingsTitle.textContent = 'All Detailed Findings';
+        showAllBtn.classList.add('hide');
+        if (categoryChart) {
+             categoryChart.data.datasets[0].backgroundColor = categoryChart.data.datasets[0].backgroundColor.map(() => '#4f46e5');
+             categoryChart.update();
+        }
+    });
+
+    const createCharts = () => {
+        const categoryCounts = allFindings.reduce((acc, f) => {
+            acc[f.category] = (acc[f.category] || 0) + 1;
+            return acc;
+        }, {});
+
+        const categories = Object.keys(categoryCounts);
+        const counts = Object.values(categoryCounts);
+        const totalIssues = allFindings.length;
+        const qualityScore = Math.max(0, Math.round(100 - totalIssues * 5));
+
+        if(qualityScoreChart) qualityScoreChart.destroy();
+        const qualityCtx = document.getElementById('qualityScoreChart').getContext('2d');
+        qualityScoreChart = new Chart(qualityCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Quality Score', 'Issues'],
+                datasets: [{
+                    data: [qualityScore, 100 - qualityScore],
+                    backgroundColor: ['#4f46e5', '#e5e7eb'],
+                    borderColor: ['#ffffff', '#ffffff'],
+                    borderWidth: 4,
+                    cutout: '70%',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false },
+                },
+                elements: {
+                    arc: {
+                        borderRadius: 8,
+                    }
+                }
+            },
+            plugins: [{
+                id: 'doughnutText',
+                afterDraw(chart) {
+                    const { ctx, width, height } = chart;
+                    ctx.restore();
+                    const fontSize = (height / 114).toFixed(2);
+                    ctx.font = `bold ${fontSize}em Inter, sans-serif`;
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#1c1917';
+                    const text = `${qualityScore}%`;
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    const textY = height / 2;
+                    ctx.fillText(text, textX, textY);
+                    ctx.save();
+                }
+            }]
+        });
+
+        const initialColors = categories.map(() => '#4f46e5');
+        const hoverColors = categories.map(() => '#3730a3');
+
+        if(categoryChart) categoryChart.destroy();
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        categoryChart = new Chart(categoryCtx, {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [{
+                    label: 'Number of Issues',
+                    data: counts,
+                    backgroundColor: initialColors,
+                    borderColor: '#ffffff',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    hoverBackgroundColor: hoverColors,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            drawBorder: false,
+                        },
+                         ticks: {
+                            stepSize: 1
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false,
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: '#1c1917',
+                        titleFont: { weight: 'bold' },
+                        bodyFont: { weight: 'normal' },
+                        displayColors: false,
+                    }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const clickedIndex = elements[0].index;
+                        const category = categories[clickedIndex];
+                        filterAndRenderFindings(category);
+
+                        const activeColors = categories.map((_, i) => i === clickedIndex ? '#3730a3' : '#a5b4fc');
+                        categoryChart.data.datasets[0].backgroundColor = activeColors;
+                        categoryChart.update();
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                }
+            }
+        });
+
+        if(performanceChart) performanceChart.destroy();
+        const perfCtx = document.getElementById('performanceChart').getContext('2d');
+        performanceChart = new Chart(perfCtx, {
+            type: 'line',
+            data: {
+                labels: ['Data Loading', 'Preprocessing', 'Training', 'Total'],
+                datasets: [
+                    {
+                        label: 'Before Optimization',
+                        data: [1.2, 5.5, 25.3, 32.0],
+                        borderColor: '#f97316',
+                        backgroundColor: '#f9731633',
+                        fill: false,
+                        tension: 0.2
+                    },
+                    {
+                        label: 'After Optimization',
+                        data: [1.1, 1.8, 8.2, 11.1],
+                        borderColor: '#10b981',
+                        backgroundColor: '#10b98133',
+                        fill: false,
+                        tension: 0.2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Execution Time (seconds)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                }
+            }
+        });
+
+    };
+
+    analyzeBtn.addEventListener('click', () => {
+        const inputContainer = analyzeBtn.closest('.bg-white');
+        inputContainer.classList.add('hide');
+        loaderSection.classList.remove('hide');
+
+        setTimeout(() => {
+            loaderSection.classList.add('hide');
+            resultsDashboard.classList.remove('hide');
+            createCharts();
+            renderFindings(allFindings);
+            findingsTitle.textContent = 'All Detailed Findings';
+            showAllBtn.classList.add('hide');
+        }, 2000);
+    });
+});
+</script>
+
+</body>
+</html>

@@ -2,7 +2,8 @@
 
 import ast
 import re
-from .rules import get_comprehensive_rules
+# CORRECTED: The import path is now direct.
+from rules import get_comprehensive_rules
 
 class MLCodeReviewer:
     """
@@ -29,15 +30,16 @@ class MLCodeReviewer:
         # Generic pattern-based checks
         for category, details in self.rules.items():
             severity = details.get('severity', 'suggestion')
-            for pattern, message in details.get('patterns', []):
-                if re.search(pattern, code, re.IGNORECASE):
-                    line_num = self._find_line_for_pattern(lines, pattern)
-                    issues.append({
-                        'line': line_num,
-                        'issue': message,
-                        'severity': severity,
-                        'category': category
-                    })
+            if 'patterns' in details:
+                for pattern, message in details.get('patterns', []):
+                    if re.search(pattern, code, re.IGNORECASE):
+                        line_num = self._find_line_for_pattern(lines, pattern)
+                        issues.append({
+                            'line': line_num,
+                            'issue': message,
+                            'severity': severity,
+                            'category': category
+                        })
 
         # Specific, more complex checks
         issues.extend(self._detect_scaling_issues(code, lines))
@@ -126,4 +128,3 @@ class MLCodeReviewer:
                 report_parts.append("")
 
         return "\n".join(report_parts)
-

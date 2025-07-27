@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+uploads/
+*.log
+.env
+.DS_Store
+__pycache__/
+*.pyc
